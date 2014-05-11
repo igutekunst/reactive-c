@@ -3,7 +3,7 @@
 
 void add_one(ComputationNode * self) {
   self->value = getIntDep(self, 0) + 1;
-  printf("Evalutated. adOne = %d\n", self->value);
+  printf("Evalutated. addOne = %d\n", self->value);
 }
 
 
