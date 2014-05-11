@@ -24,11 +24,13 @@ static const char * arg_strings[] = {
 typedef struct ComputationNode ComputationNode;
 typedef struct ComputationList ComputationList;
 
-struct ComputationList{
+struct ComputationList {
     ComputationNode * computation;
     ComputationList * next;
 };
+
 typedef void (* ComputationCallback) (ComputationNode * );
+
 struct ComputationNode {
     int value;
     const char * name;
