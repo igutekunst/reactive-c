@@ -5,6 +5,15 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+void color_printf(const char * color, const char * format, ...) {
+  va_list args;
+  printf(color);
+  va_start(args, format);
+  vprintf(format, args);
+  va_end(args);
+  printf(ANSI_COLOR_RESET);
+}
+
 ComputationList * append_arg(ComputationList ** computationList, ComputationNode * computation) {
     ComputationList * newComputationList = (ComputationList *) malloc(sizeof(ComputationList));
     newComputationList->computation = computation;
@@ -17,44 +26,71 @@ ComputationList * append_arg(ComputationList ** computationList, ComputationNode
 }
 
 
-void print_space(int space){
+void print_pipes(int space){
   for(int i = 0; i < space; i++) {
-    printf(" ") ;
+        printf("  │") ;
   }
 }
 
 
-int print_tree(ComputationNode * node, int depth) {
+void print_space(int space, bool last){
+  for(int i = 0; i < space; i++) {
+    if (i == space - 1){
+        if (last) {
+          printf("  └") ;
+        } else {
+          printf("  ├") ;
+        }
+    } else {
+        printf("  │") ;
+    }
+  }
+  if (space) {
+        printf("── ") ;
+  }
+}
+
+
+int m_print_tree(ComputationNode * node, int depth, bool last) {
   int numArgs = node->numArgs;
-  int numArgsBelow = 0;
-  for (int i = 0; i < numArgs; i++){
-    numArgsBelow += print_tree(node->args[i], depth + 1 );
+  bool hasChildren = (bool) numArgs;
+
+  print_space(depth, last );
+  const char * color = node->valid ? GREEN : RED;
+  color_printf(color, "%s ", node->name);
+  printf("[%d]\n", node->value);
+
+  if (!last) {
+    printf("  ");
+    print_pipes(depth + hasChildren);
+    printf("\n");
+  } else {
+    printf("  ");
+    print_pipes(depth - 1);
+    printf("\n");
   }
 
   for (int i = 0; i < numArgs; i++){
-    print_space(numArgsBelow * 2 / (numArgs  +1) );
-    printf("%s", node->args[i]->name);
+    printf("  ");
+    m_print_tree(node->args[i], depth + 1, i == numArgs - 1);
   }
-  printf("\n");
-  if (depth == 0) {
-    print_space((numArgsBelow * 2 )/ 2);
-        
-    printf("%s", node->name);
-  }
+
+}
+void print_tree(ComputationNode * node) {
+  m_print_tree(node, 0, false);
 }
 
 
-ComputationNode * create_computation(const char * name, ComputationCallback computation, ... ) {
+ComputationNode * v_create_computation(const char * name, ComputationCallback computation, va_list args ) {
     ComputationNode * computationNode = (ComputationNode *) malloc(sizeof(ComputationNode));
     
     computationNode->name = name;
     computationNode->computation = computation;
     computationNode->dependencies = NULL;
-    //
-    va_list args;
-    va_start(args, computation);
+
     ComputationNode * dependency;
     computationNode->numArgs = 0;
+
     do {
         dependency = va_arg (args, ComputationNode * );
         if ( dependency->type == END){
@@ -67,8 +103,11 @@ ComputationNode * create_computation(const char * name, ComputationCallback comp
         computationNode->numArgs++;
     } while (true);
 
-    computationNode->args = (struct ComputationNode **) malloc(sizeof(ComputationNode) * computationNode->numArgs);         
+    computationNode->args = (struct ComputationNode **) 
+                             malloc(sizeof(ComputationNode) * computationNode->numArgs);         
+
     printf("There are %d args\n", computationNode->numArgs); 
+
     int i;
     ComputationList * currentDependency = computationNode->dependencies;
     int len = computationNode->numArgs;
@@ -76,8 +115,18 @@ ComputationNode * create_computation(const char * name, ComputationCallback comp
         computationNode->args[len - 1 - i] = (currentDependency->computation);
         currentDependency = currentDependency->next;
     }
+
     computationNode->valid = false;
     return computationNode;
+}
+
+ComputationNode * create_computation(const char * name, ComputationCallback computation, ... ) {
+  va_list args;
+  va_start(args, computation);
+  ComputationNode * newComputation = v_create_computation(name, computation, args);
+  va_end(args);
+  return newComputation;
+
 }
 
 
@@ -161,7 +210,7 @@ int getIntDep(ComputationNode * self, int number) {
 void * evaluate(ComputationNode * self) {
     if (self->valid){
         printf("Node is valid\n");
-        return &(self->value) ;
+        return (void * ) &(self->value) ;
     }
     printf("Node is invalid. Evaluating\n");
     for(int i = 0; i < self->numArgs; i++) {
@@ -173,7 +222,7 @@ void * evaluate(ComputationNode * self) {
     }
     self->computation(self);
     self->valid = true;
-    return &(self->value);
+    return (void *)&(self->value);
 }
 
 
@@ -214,7 +263,9 @@ void nop(ComputationNode * self) {
  */
 ComputationNode * Int(int a){
     
-    ComputationNode * newComputation = create_computation("Int", nop, End());
+    char * str = (char * ) malloc(50);
+    snprintf(str, 60, "Int(%d)", a);
+    ComputationNode * newComputation = create_computation(str, nop, End());
     newComputation->type = INT;
     newComputation->value = a;
     newComputation->valid = true;
@@ -222,10 +273,44 @@ ComputationNode * Int(int a){
 }
 
 
+void foldr(Int_Int_Int f, ComputationNode * self) { 
+  if (self->numArgs == 0) {
+    self->value = 0;
+  } else {
+    int start = getIntDep(self, 0);
+    for(int i = 1; i < self->numArgs; i++) {
+      start = f(start, getIntDep(self, i));
+    }
+    self->value = start;
+  }
+
+}
+
+
+int sum(int a, int b) {
+  return a + b;
+}
+
+
+void do_Sum(ComputationNode * self) {
+  foldr(sum, self);
+}
+
+
+ComputationNode * FoldR(ComputationCallback f, ...) {
+  va_list args;
+  va_start(args, f);
+  ComputationNode * newComputation = v_create_computation("Sum()", f, args);
+  va_end(args);
+  return newComputation;
+
+}
+
+
 ComputationNode * End(){
-    ComputationNode * newComputation = (ComputationNode *) malloc(sizeof(ComputationNode));
-    newComputation->name = "END";
-    newComputation->valid = true;
-    newComputation->type = END;
-    return newComputation;
+  ComputationNode * newComputation = (ComputationNode *) malloc(sizeof(ComputationNode));
+  newComputation->name = "END";
+  newComputation->valid = true;
+  newComputation->type = END;
+  return newComputation;
 }

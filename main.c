@@ -9,21 +9,21 @@ void add_one(ComputationNode * self) {
 
 int main(int argc, char * argv[]) {
   ComputationNode * x = Int(5);
-  ComputationNode * c = create_computation("AddOne", add_one, x,  Int(7), End());
-  
-  int * v = (int *) evaluate(c);
-  printf("Value: %d\n", *v);
-  v = (int *) evaluate(c);
-  printf("Value: %d\n", *v);
+  ComputationNode * y = Int(2);
+  ComputationNode * s = FoldR(do_Sum, Int(5), x, End());
+  ComputationNode * s1 = FoldR(do_Sum, s, Int(5), y, End());
+  printf("\n\nComputation Graph\n"
+             "=================\n\n");
+  evaluate(s1);
+  print_tree(s1);
+    
+  x->value = 7;
+  invalidate(x);
+  print_tree(s1);
+  evaluate(s1);
 
-  x->value = 8;
-  propagate(x);
-
-  v = (int *) evaluate(c);
-  printf("Value: %d\n", *v);
-  print_tree(c, 0);
-
-  free_computation_node(c);
+  print_tree(s1);
+  free_computation_node(s);
 }
 
 
