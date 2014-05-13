@@ -263,9 +263,7 @@ void nop(ComputationNode * self) {
  */
 ComputationNode * Int(int a){
     
-    char * str = (char * ) malloc(50);
-    snprintf(str, 60, "Int(%d)", a);
-    ComputationNode * newComputation = create_computation(str, nop, End());
+    ComputationNode * newComputation = create_computation("Int", nop, End());
     newComputation->type = INT;
     newComputation->value = a;
     newComputation->valid = true;
